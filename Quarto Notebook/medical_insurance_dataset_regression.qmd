@@ -1,0 +1,196 @@
+---
+title: "Insurance Cost Analysis"
+author: "Aman Bhattarai"
+format: 
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+execute:
+  echo: true
+  warning: false
+---
+
+# Introduction
+
+This project analyzes an insurance database to understand factors affecting insurance charges and develop predictive models.
+
+# Setup
+
+```{python}
+#| label: setup
+#| warning: false
+
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Set style and size
+plt.rcParams['figure.figsize'] = (10, 6)
+```
+
+# Data Loading and Cleaning
+
+## Import Dataset
+
+```{python}
+#| label: import-data
+
+# Load the dataset
+filepath = 'medical_insurance_dataset.csv'
+df = pd.read_csv(filepath, header=None)
+
+# Add headers to the dataframe
+headers = ["age", "gender", "bmi", "no_of_children", "smoker", "region", "charges"]
+df.columns = headers
+
+# Display the first 10 rowsFirst 10 rows of the dataset:")
+print(df.head(10))
+```
+
+## Handle Missing Data
+
+```{python}
+#| label: handle-missing-data
+
+# Replace '?' with NaN
+df.replace('?', np.nan, inplace=True)
+
+print("Missing values:")
+print(df.isnull().sum())
+
+# Handle missing data
+mean_age = df['age'].astype('float').mean()
+df['age'] = df['age'].replace(np.nan, mean_age)
+
+is_smoker = df['smoker'].value_counts().idxmax()
+df['smoker'] = df['smoker'].replace(np.nan, is_smoker)
+
+# Update data types
+df[["age", "smoker"]] = df[["age", "smoker"]].astype("int")
+
+# Round charges to 2 decimal places
+df[["charges"]] = np.round(df[["charges"]], 2)
+
+print("\nDataframe info after cleaning:")
+print(df.info())
+```
+
+# Exploratory Data Analysis (EDA)
+
+## Regression Plot: BMI vs Charges
+
+```{python}
+#| label: bmi-charges-plot
+
+plt.figure(figsize=(10, 6))
+sns.regplot(x="bmi", y="charges", data=df)
+plt.ylim(0,)
+plt.title("BMI vs Charges")
+plt.show()
+```
+
+## Box Plot: Smoker vs Charges
+
+```{python}
+#| label: smoker-charges-plot
+
+plt.figure(figsize=(10, 6))
+sns.boxplot(x='smoker', y='charges', data=df)
+plt.title("Smoker vs Charges")
+plt.show()
+```
+
+## Correlation Matrix
+
+```{python}
+#| label: correlation-matrix
+
+plt.figure(figsize=(12, 10))
+sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+plt.title("Correlation Matrix")
+plt.show()
+```
+
+# Model Development
+
+## Linear Regression: Smoker Only
+
+```{python}
+#| label: lr-smoker-only
+
+lr = LinearRegression()
+X = df[['smoker']]
+Y = df[['charges']]
+lr.fit(X, Y)
+print(f"R2 score (smoker only): {lr.score(X, Y):.4f}")
+```
+
+## Linear Regression: All Attributes
+
+```{python}
+#| label: lr-all-attributes
+
+Xnew = df.drop('charges', axis=1)
+lr.fit(Xnew, Y)
+print(f"R2 score (all attributes): {lr.score(Xnew, Y):.4f}")
+```
+
+## Pipeline: StandardScaler, PolynomialFeatures, LinearRegression
+
+```{python}
+#| label: pipeline 
+
+Input = [('scale', StandardScaler()), 
+         ('polynomial', PolynomialFeatures(include_bias=False)), 
+         ('model', LinearRegression())]
+pipe = Pipeline(Input)
+Xupd = Xnew.astype(float)
+pipe.fit(Xupd, Y)
+ypipe = pipe.predict(Xupd)
+print(f"R2 score (pipeline): {r2_score(Y, ypipe):.4f}")
+```
+
+# Model Refinement
+
+## Data Splitting
+
+```{python}
+#| label: data-splitting into training and testing set
+
+x_train, x_test, y_train, y_test = train_test_split(Xupd, Y, test_size=0.2, random_state=1)
+```
+
+## Ridge Regression
+
+```{python}
+#| label: ridge-regression
+
+RR = Ridge(alpha=0.1)
+RR.fit(x_train, y_train)
+y_predict = RR.predict(x_test)
+print(f"R2 score (Ridge Regression): {r2_score(y_test, y_predict):.4f}")
+```
+
+## Polynomial Ridge Regression
+
+```{python}
+#| label: poynomial-ridge-regression
+
+pr = PolynomialFeatures(degree=2)
+x_train_pr = pr.fit_transform(x_train)
+x_test_pr = pr.fit_transform(x_test)
+RR.fit(x_train_pr, y_train)
+y_predict_pr = RR.predict(x_test_pr)
+print(f"R2 score (Polynomial Ridge Regression): {r2_score(y_test, y_predict_pr):.4f}")
+```
+
+# Conclusion
+
+This analysis explored various factors affecting insurance charges and developed predictive models using different regression techniques. The pipeline regression model showed the best performance in predicting insurance charges based on the given attributes.
